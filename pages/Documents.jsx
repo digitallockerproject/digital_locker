@@ -8,6 +8,6 @@ export default function Documents({ documents, onView, onShare, emptyMessage = '
     <tbody>{documents.map(doc => <tr key={doc.id}>
       <td><button className="file-button" onClick={() => onView(doc)}><span className={`file-tile ${doc.extension === 'PNG' ? 'purple' : ''}`}><Icon name="file" size={21} /><span>{doc.extension}</span></span><span><strong>{doc.name}</strong><small>{doc.size}</small></span></button></td>
       <td><span className="category-label">{doc.category}</span></td><td><Status value={doc.status} /></td><td className="date-cell">{doc.date}</td>
-      <td><button className="icon-button" aria-label={`Share ${doc.name}`} disabled={doc.status !== 'Clean'} title={doc.status === 'Clean' ? 'Configure a demo sharing link' : 'Only documents with a clean scan can be shared'} onClick={() => onShare(doc)}><Icon name="link" size={18} /></button></td>
+      <td><button className="icon-button" aria-label={`Share ${doc.name}`} disabled={doc.status !== 'Clean'} title={doc.status === 'Clean' ? 'Configure a sharing link' : 'Only documents with a clean scan can be shared'} onClick={() => onShare(doc)}><Icon name="link" size={18} /></button></td>
     </tr>)}</tbody></table></div>;
 }

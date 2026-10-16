@@ -12,9 +12,9 @@ export const initialLinks = [
   { id: 'link-3', documentId: 'aid', recipient: 'University advisor', expires: 'Oct 12, 2026', views: 3, maxViews: 3, status: 'Expired' },
 ];
 export const initialActivity = [
-  { id: 'a1', icon: 'eye', title: 'Spring transcript.pdf was viewed', detail: 'Scholarship office · sample shared link', time: 'Today, 10:42 AM' },
-  { id: 'a2', icon: 'shield', title: 'Spring transcript.pdf passed its scan', detail: 'Example clean result · ready to share', time: 'Yesterday, 3:18 PM' },
+  { id: 'a1', icon: 'eye', title: 'Spring transcript.pdf was viewed', detail: 'Scholarship office · shared link', time: 'Today, 10:42 AM' },
+  { id: 'a2', icon: 'shield', title: 'Spring transcript.pdf passed its scan', detail: 'Clean result · ready to share', time: 'Yesterday, 3:18 PM' },
   { id: 'a3', icon: 'link', title: 'A sharing link was created', detail: 'Apartment lease.pdf · limited to 3 views', time: 'Oct 14, 4:30 PM' },
-  { id: 'a4', icon: 'alert', title: 'Tax form attachment.pdf was flagged', detail: 'Example warning · sharing is unavailable', time: 'Oct 11, 11:06 AM' },
+  { id: 'a4', icon: 'alert', title: 'Tax form attachment.pdf was flagged', detail: 'Review required · sharing is unavailable', time: 'Oct 11, 11:06 AM' },
 ];
 export const categories = ['Academic', 'Housing', 'Personal', 'Financial'];
