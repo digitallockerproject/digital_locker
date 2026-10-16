@@ -12,7 +12,7 @@ A responsive visual prototype for a student document locker. Built with React, V
 - Activity timeline, sample profile settings, notification preference, and reset.
 - Responsive navigation, keyboard focus indicators, native accessible dialogs, and feedback messages.
 
-**This is a frontend demo, not a secure document service.** All documents are fictional. No files are uploaded, scanned, encrypted, stored, or shared. Links are sample records without working URLs. Preferences and changes live in memory and reset on refresh. The initial timestamps are illustrative, not live events.
+**This is a temporary frontend demo, services will be integrated later.
 
 ## Run locally
 
@@ -51,18 +51,6 @@ vite.config.js                 GitHub Pages base path
 
 The screenshot showed a folder named `.githubworkflows`. GitHub needs two nested folders: `.github/workflows`. This starter supplies the correct path. Empty `temp.txt` files are placeholders and may be removed.
 
-## Publish to your existing GitHub repository
+## Planned
 
-1. Copy this starter's files into the root of `rasrafee/digital_locker`. Include the hidden `.github` folder and `.gitignore`.
-2. Commit and push the changes to `main`.
-3. On GitHub open **Settings → Pages** and set **Source → GitHub Actions**.
-4. Open the **Actions** tab and wait for **Deploy Digital Locker** to finish. If Pages was enabled after the initial push, run the workflow manually.
-5. Open `https://rasrafee.github.io/digital_locker/` after a successful deployment.
-
-`vite.config.js` already sets `base: '/digital_locker/'`. Update it if you rename the repository. Navigation is handled inside the app, so refreshing does not require server-side route rewrites.
-
-Official deployment reference: https://vite.dev/guide/static-deploy.html#github-pages
-
-## Next steps
-
-Replace demo state with authenticated API calls only when the backend is ready. Planned services include authentication, quarantine storage, malware scanning, private encrypted storage, server-enforced sharing limits, and access logs. Security decisions and secrets must remain on the server. Never commit personal documents or cloud credentials.
+Replacing demo state with authenticated API calls only when the backend is ready. Planned services include authentication, quarantine storage, malware scanning, private encrypted storage, server-enforced sharing limits, and access logs. Security decisions and secrets must remain on the server. Never commit personal documents or cloud credentials.
