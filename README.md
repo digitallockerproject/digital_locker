@@ -1,6 +1,6 @@
 # Digital Locker
 
-A responsive visual prototype for a student document locker. Built with React, Vite, and plain CSS: rounded panels, a dark background, blue buttons, and readable light text.
+A responsive visual prototype for a student document locker. Built with React, Vite, and plain CSS.
 
 ## What is included
 
