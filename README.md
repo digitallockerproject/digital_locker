@@ -1,6 +1,6 @@
 # Digital Locker
 
-A responsive visual prototype for a student document locker. Built with React, Vite, and plain CSS.
+A student document workspace built with React, Vite, and plain CSS, with Amazon Cognito sign-in. See [AUTH_SETUP.md](AUTH_SETUP.md) for the Cognito settings, installation steps, and current limitations.
 
 ## What is included
 
@@ -9,10 +9,10 @@ A responsive visual prototype for a student document locker. Built with React, V
 - Document-details dialog and example clean, flagged, and quarantined states.
 - Simulated upload flow: quarantine → scanning → chosen result.
 - Demo sharing controls with expiration, view limits, and revocation.
-- Activity timeline, sample profile settings, notification preference, and reset.
+- Activity timeline, read-only signed-in account details, notification preference, and reset.
 - Responsive navigation, keyboard focus indicators, native accessible dialogs, and feedback messages.
 
-**This is a temporary frontend demo, services will be integrated later.
+**Cognito authentication is connected. Document uploads, scan transitions, storage, and sharing remain frontend demonstrations until their backend services are implemented.**
 
 ## Run locally
 
@@ -53,4 +53,4 @@ The screenshot showed a folder named `.githubworkflows`. GitHub needs two nested
 
 ## Planned
 
-Replacing demo state with authenticated API calls only when the backend is ready. Planned services include authentication, quarantine storage, malware scanning, private encrypted storage, server-enforced sharing limits, and access logs. Security decisions and secrets must remain on the server. Never commit personal documents or cloud credentials.
+Replace the remaining demo state with authenticated API calls when the backend is ready. Planned services include quarantine storage, malware scanning, private encrypted storage, server-enforced sharing limits, and access logs. The backend must validate access tokens and check document ownership. Security decisions and secrets must remain on the server. Never commit personal documents or cloud credentials.

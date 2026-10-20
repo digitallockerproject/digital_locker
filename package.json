@@ -9,12 +9,16 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "oidc-client-ts": "^3.5.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-oidc-context": "^3.3.1"
   },
   "devDependencies": {
     "vite": "^7.1.0"
   },
   "packageManager": "pnpm@11.25.0",
-  "engines": { "node": ">=22.12.0" }
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }

@@ -9,3 +9,30 @@
 @media(max-width:460px){main{padding-inline:15px}.topbar{padding-inline:15px}.page-heading{flex-wrap:wrap;margin-bottom:20px}.page-heading>.button{margin-top:0}.page-heading h1{font-size:25px}.right-column{display:flex}.workflow-note{margin:0;padding:0 7px}.storage-panel{width:100%}.upload-card{text-align:center}.upload-illustration{margin-inline:auto}.panel-heading p{font-size:10px}.activity-list time{max-width:55px}.activity-list li{gap:9px}.document-table th,.document-table td{padding-inline:8px}.file-button{gap:8px}.file-button strong{font-size:10px}.file-tile{width:29px;height:37px}.status{font-size:8px;padding:5px 6px}.document-table td:last-child{padding-right:9px}.panel-heading .text-button{font-size:10px}.modal{padding:22px}.form-grid{gap:10px}.modal-heading h2{font-size:18px}.filters{flex-wrap:wrap}.filters label{min-width:calc(50% - 6px)}.workspace-footer{gap:10px}.workspace-footer>span:first-child{white-space:nowrap}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 @media(max-width:760px){.sidebar{visibility:hidden}.sidebar.is-open{visibility:visible}}
+
+/* Account sign-in and session screens. */
+.account-actions{display:flex;align-items:center;gap:12px}
+.account-fields label{display:flex;flex-direction:column;gap:9px;font-size:11px;color:#bbc8df;margin-bottom:19px}
+.account-fields input[readonly]{color:#c4d2eb;background:#101724}
+main.auth-page{display:flex;flex-direction:column;min-height:100dvh;max-width:1320px;padding:38px 56px 24px;margin:0 auto}
+.auth-brand{display:inline-flex;align-items:center;gap:12px;font-size:23px;font-weight:700;letter-spacing:-.8px;align-self:flex-start}
+.auth-layout{display:grid;grid-template-columns:minmax(0,1fr) 420px;align-items:center;gap:80px;flex:1;padding:80px 0}
+.auth-introduction .eyebrow{font-size:10px;letter-spacing:2px;color:#8baad9;margin-bottom:25px}
+.auth-introduction h1{font-size:clamp(38px,4.8vw,65px);font-weight:600;line-height:1.16;letter-spacing:-2.2px}
+.auth-introduction h1 span{color:#8cb9ff}
+.auth-introduction>p:not(.eyebrow){font-size:15px;line-height:1.9;color:#a0aec5;margin:24px 0 32px}
+.auth-feature{display:flex;align-items:center;gap:12px;color:#afbed7;font-size:12px;margin:18px 0}
+.auth-feature svg{color:#7faefa}
+.auth-card{background:radial-gradient(ellipse at 50% 0%,#24477c44,transparent 72%),#151d2d;border:1px solid #304464;border-radius:25px;padding:35px 31px;box-shadow:0 20px 80px #0002}
+.auth-lock{display:grid;place-items:center;width:61px;height:65px;border:1px solid #3d6094;border-radius:18px;background:#223b61;color:#a3c7ff;margin-bottom:28px}
+.auth-card h2{font-size:24px;line-height:1.4;letter-spacing:-.6px}
+.auth-message{font-size:13px;color:#a8b7d0;line-height:1.85;margin:14px 0 26px;min-height:48px}
+.auth-message.error{border:1px solid #765145;background:#3b2926;color:#f2c8b8;border-radius:10px;padding:13px;min-height:0}
+.auth-sign-in{min-height:47px;white-space:normal;line-height:1.6;font-size:12px}
+.auth-help{font-size:10px;line-height:1.9;text-align:center;color:#8c9ebc;margin-top:20px}
+.auth-footer{font-size:10px;line-height:1.8;color:#8192af;padding-top:16px}
+.auth-spinner{display:block;width:16px;height:16px;border:2px solid #ffffff55;border-top-color:white;border-radius:50%;animation:auth-spin .8s linear infinite}
+@keyframes auth-spin{to{transform:rotate(360deg)}}
+@media(max-width:1000px){main.auth-page{padding-inline:35px}.auth-layout{gap:40px;grid-template-columns:minmax(0,1fr) 365px}.auth-card{padding:30px 25px}.auth-introduction h1{font-size:45px}}
+@media(max-width:760px){main.auth-page{padding:27px 23px 20px}.auth-layout{grid-template-columns:1fr;gap:38px;padding:58px 0 45px}.auth-introduction h1{font-size:45px}.auth-introduction>p:not(.eyebrow){font-size:13px;margin-bottom:20px}.auth-feature{font-size:11px;margin-block:13px}.auth-card{max-width:460px;width:100%;justify-self:center}.account-actions .workspace-pill{display:none}.account-actions .button{font-size:10px;min-height:32px;padding-inline:10px}.topbar .breadcrumbs>span:first-of-type{display:none}}
+@media(max-width:420px){main.auth-page{padding-inline:20px}.auth-brand{font-size:21px}.auth-introduction h1{font-size:38px;letter-spacing:-1.4px}.auth-card{padding:26px 23px;border-radius:20px}.auth-card h2{font-size:21px}.auth-layout{padding-top:45px}.auth-message{font-size:12px}}
