@@ -1,5 +1,7 @@
 # Upload setup
 
+Current status: deployed in us-east-2 and connected through the GitHub repository variable `VITE_DOCUMENT_API_URL`. Billing was checked after deployment: Free plan, $0.00 due, with a May 6, 2027 end date. The instructions below are for reproducing or maintaining the deployment.
+
 The code is ready for deployment. Nothing in this package creates AWS resources until someone runs the deployment command. The AWS account owner can do that step without sharing a password or access keys.
 
 ## What this adds
@@ -89,7 +91,7 @@ Use a harmless test PDF or image, not an ID, lease, or other personal document.
 6. Requests to the API without an access token must fail. An ID token must also fail.
 7. Check Billing and the new resources after testing. Keep the account on the Free plan.
 
-These live checks have not been run yet because the backend is not deployed.
+The backend was deployed and connected on November 6, 2026. A live browser PNG upload, persistence after refresh, an identical downloaded copy, and rejection of unsigned API requests were verified. A second-user isolation check and live oversized/unsupported-file checks are still available to run; automated tests cover those backend rules.
 
 ## Limits and cleanup
 

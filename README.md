@@ -50,4 +50,4 @@ python3 -m venv .venv
 AWS_DEFAULT_REGION=us-east-2 AWS_EC2_METADATA_DISABLED=true .venv/bin/cfn-lint backend/template.yaml
 ```
 
-The tests mock AWS calls; they do not create cloud resources or prove that a particular AWS account will allow deployment. The frontend build, 6 frontend request tests, and 15 backend tests pass, and the template passes cfn-lint. Live AWS checks remain in the setup guide.
+The tests mock AWS calls; they do not create cloud resources or prove that a particular AWS account will allow deployment. The frontend build, 6 frontend request tests, and 16 backend tests pass, and the template passes cfn-lint. A live browser upload, page refresh, and matching download were verified on November 6, 2026. The API also rejected unsigned requests. Additional manual checks remain in the setup guide.
