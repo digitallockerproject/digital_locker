@@ -8,7 +8,7 @@ export default function Modal({ title, onClose, children }) {
     dialog.showModal();
     return () => dialog.close();
   }, []);
-  return <dialog ref={ref} className="modal" aria-labelledby="modal-title" onCancel={onClose} onClick={event => { if (event.target === ref.current) onClose(); }}>
+  return <dialog ref={ref} className="modal" aria-labelledby="modal-title" onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === ref.current) onClose(); }}>
     <header className="modal-heading"><h2 id="modal-title">{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={onClose}><Icon name="close" /></button></header>
     {children}
   </dialog>;

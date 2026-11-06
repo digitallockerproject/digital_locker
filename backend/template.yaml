@@ -1,0 +1,164 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Digital Locker private upload demo
+Parameters:
+  FreePlanConfirmed:
+    Type: String
+    Default: 'no'
+    AllowedValues: ['no', 'yes']
+    Description: Set yes only after the account owner checks the Free account plan and remaining credits.
+  WebOrigin:
+    Type: String
+    Default: https://digitallockerproject.github.io
+    AllowedValues: [https://digitallockerproject.github.io]
+  UserPoolId:
+    Type: String
+    Default: us-east-2_uFg6KbLXG
+  ClientId:
+    Type: String
+    Default: 4bm0b0hac4qikacbs3mtc88k5g
+Rules:
+  RequireFreePlan:
+    Assertions:
+      - Assert: !Equals [!Ref FreePlanConfirmed, 'yes']
+        AssertDescription: The account owner must confirm the Free account plan before deployment.
+Resources:
+  Files:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Ref WebOrigin]
+            AllowedMethods: [POST]
+            AllowedHeaders: ['*']
+            MaxAge: 300
+  FilesPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Files
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt Files.Arn, !Sub '${Files.Arn}/*']
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+  Documents:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: '$default'
+      CorsConfiguration:
+        AllowOrigins: [!Ref WebOrigin]
+        AllowHeaders: [authorization, content-type]
+        AllowMethods: [GET, POST, OPTIONS]
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 4
+        ThrottlingRateLimit: 2
+      Auth:
+        DefaultAuthorizer: Cognito
+        Authorizers:
+          Cognito:
+            IdentitySource: '$request.header.Authorization'
+            JwtConfiguration:
+              issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}'
+              audience: [!Ref ClientId]
+  UploadFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: app.handler
+      Runtime: python3.13
+      MemorySize: 128
+      Timeout: 15
+      # No reserved concurrency: small Free plan accounts may not have enough
+      # regional concurrency to reserve it. API throttling limits normal traffic.
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Documents
+          BUCKET_NAME: !Ref Files
+          CLIENT_ID: !Ref ClientId
+          ISSUER: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPoolId}'
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: [s3:PutObject, s3:GetObject]
+              Resource: !Sub '${Files.Arn}/private/*'
+            - Effect: Allow
+              Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:UpdateItem, dynamodb:PutItem]
+              Resource: !GetAtt Documents.Arn
+      Events:
+        List:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents
+            Method: GET
+        Reserve:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /uploads
+            Method: POST
+        Complete:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents/{id}/complete
+            Method: POST
+        Download:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents/{id}/download
+            Method: GET
+  FunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${UploadFunction}'
+      RetentionInDays: 7
+Outputs:
+  ApiUrl:
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'
+  BucketName:
+    Value: !Ref Files
+  TableName:
+    Value: !Ref Documents

@@ -6,3 +6,7 @@ dist/
 *.local
 *.log
 .DS_Store
+.aws-sam/
+.venv/
+__pycache__/
+samconfig.toml

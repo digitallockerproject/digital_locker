@@ -36,6 +36,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build website
         run: pnpm build
+        env:
+          VITE_DOCUMENT_API_URL: ${{ vars.VITE_DOCUMENT_API_URL }}
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
       - name: Upload website

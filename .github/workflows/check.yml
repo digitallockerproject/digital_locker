@@ -1,0 +1,26 @@
+name: Check uploads
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test tests/document-api.test.mjs
+      - run: npm run build
+      - run: python3 -m venv .venv
+      - run: .venv/bin/pip install -r backend/requirements-dev.txt
+      - run: .venv/bin/python -m unittest discover -s backend/tests -v
+      - run: .venv/bin/cfn-lint backend/template.yaml
+        env:
+          AWS_DEFAULT_REGION: us-east-2
+          AWS_EC2_METADATA_DISABLED: 'true'

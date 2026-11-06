@@ -64,13 +64,11 @@ OIDC state and tokens use `sessionStorage` in the current browser tab. A page re
 
 **Sign out** attempts refresh-token revocation, clears the local session, and visits Cognito's logout endpoint. The app clears code and state parameters from the address after successful sign-in. A failed callback shows a retry screen instead of the locker. Expired sessions require sign-in again if token renewal does not succeed.
 
-## Current limits
+## Upload backend
 
-Authentication uses Cognito. Document records, upload/scan transitions, sharing records, and notification preferences are still fictional in-memory interface data. There are no real uploads, malware scans, cloud document storage, working sharing URLs, or per-user document records yet. Refreshing or signing out discards workspace changes. All signed-in users currently see the same fictional seed documents.
+Private file uploads now have a separate backend. See [OWNER_SETUP.md](OWNER_SETUP.md) for deployment and [README.md](README.md) for the request flow. Existing Cognito identifiers and sign-in behavior are unchanged. The API verifies access tokens and uses the verified `sub` to separate document records.
 
-Account details in Settings are read-only and come from Cognito's token claims. Profile editing is not included. When a name claim is absent, the app derives a display label from the email address.
-
-The frontend gate does not authorize private files. Before accepting real documents, add a backend that validates access-token signatures and claims, checks scopes/client and ownership, and uses the verified Cognito `sub` as the owner identifier. Keep S3 private and enforce document access and sharing limits on the server.
+There is no malware scanner or public sharing service. Uploaded files show **Not scanned**. Files and metadata persist in AWS; browser-only preferences and fictional sample records are no longer used by the active document screens.
 
 ## Troubleshooting
 

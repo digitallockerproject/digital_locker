@@ -1,56 +1,53 @@
 # Digital Locker
 
-A student document workspace built with React, Vite, and plain CSS, with Amazon Cognito sign-in. See [AUTH_SETUP.md](AUTH_SETUP.md) for the Cognito settings, installation steps, and current limitations.
-
-## What is included
-
-- Dashboard with sample document counts, storage usage, and recent activity.
-- Document list with search, categories, scan-status filters, and sorting.
-- Document-details dialog and example clean, flagged, and quarantined states.
-- Simulated upload flow: quarantine → scanning → chosen result.
-- Demo sharing controls with expiration, view limits, and revocation.
-- Activity timeline, read-only signed-in account details, notification preference, and reset.
-- Responsive navigation, keyboard focus indicators, native accessible dialogs, and feedback messages.
-
-**Cognito authentication is connected. Document uploads, scan transitions, storage, and sharing remain frontend demonstrations until their backend services are implemented.**
+A React/Vite document locker with Cognito sign-in and private AWS uploads.
 
 ## Run locally
 
-Install Node.js 22.12+ (Node 24 recommended). From the repository root:
+Use Node.js 22.12 or newer:
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Open the local address printed in the terminal. With the current configuration it ends in `/digital_locker/`.
+The local address is `http://127.0.0.1:5173/digital_locker/`. Sign-in settings are in [AUTH_SETUP.md](AUTH_SETUP.md).
 
-For a production check:
+The website starts without sample documents. If the upload API has not been configured, it shows a setup message and disables uploads. Follow [OWNER_SETUP.md](OWNER_SETUP.md) to deploy and connect the backend.
 
 ```sh
 npm run build
-npm run preview
+node --test tests/document-api.test.mjs
 ```
 
-You can also use pnpm 11.25.0: `pnpm install`, `pnpm dev`, and `pnpm build`. The committed pnpm lockfile is used by GitHub Actions. If you change dependencies with npm, update the pnpm lockfile with `pnpm import` before pushing so deployment uses the same versions.
+## How uploads work
 
-## Repository structure
+1. The browser sends the filename, size, and category to the API with its Cognito access token.
+2. API Gateway verifies the token. The function checks that it is an access token for our app, reserves storage quota, and returns a short-lived S3 upload form.
+3. The browser sends the file directly to the private S3 bucket.
+4. The API checks that the file arrived with the expected size and a matching format header, then saves its status as **Not scanned**.
+5. Listing and downloading use the signed-in user's ID. Download links last 60 seconds.
 
-```text
-.github/workflows/deploy.yml   Build and deploy to GitHub Pages
-components/                    Icons, status badges, and shared dialog
-pages/Documents.jsx            Reusable document table
-public/                        Static assets
-src/App.jsx                    Application shell, views, and demo state
-src/data.js                    Fictional seed data
-src/styles.css                 Theme, layout, and responsive styles
-src/main.jsx                   React entry point
-index.html                     HTML entry point
-vite.config.js                 GitHub Pages base path
+There is no malware scanning, public sharing, file deletion, or account editing in this version. The header check is not a scan. The original demo-only table and seed-data exports are left in the repo for reference but are not used for live document state.
+
+## Files
+
+- `src/App.jsx`: document screens and upload form.
+- `src/document-api.js`: requests and direct S3 uploads.
+- `src/auth-config.js`: existing Cognito sign-in settings.
+- `backend/app.py`: upload, list, confirmation, and download endpoints.
+- `backend/template.yaml`: AWS resources and runtime permissions.
+- `OWNER_SETUP.md`: account checks, deployment, and remaining live tests.
+
+## Backend checks
+
+Use a separate Python environment:
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements-dev.txt
+.venv/bin/python -m unittest discover -s backend/tests -v
+AWS_DEFAULT_REGION=us-east-2 AWS_EC2_METADATA_DISABLED=true .venv/bin/cfn-lint backend/template.yaml
 ```
 
-The screenshot showed a folder named `.githubworkflows`. GitHub needs two nested folders: `.github/workflows`. This starter supplies the correct path. Empty `temp.txt` files are placeholders and may be removed.
-
-## Planned
-
-Replace the remaining demo state with authenticated API calls when the backend is ready. Planned services include quarantine storage, malware scanning, private encrypted storage, server-enforced sharing limits, and access logs. The backend must validate access tokens and check document ownership. Security decisions and secrets must remain on the server. Never commit personal documents or cloud credentials.
+The tests mock AWS calls; they do not create cloud resources or prove that a particular AWS account will allow deployment. The frontend build, 6 frontend request tests, and 15 backend tests pass, and the template passes cfn-lint. Live AWS checks remain in the setup guide.
