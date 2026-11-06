@@ -11,7 +11,10 @@ from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-s3 = boto3.client('s3', config=Config(signature_version='s3v4'))
+REGION = os.environ.get('AWS_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-2'))
+# Regional URLs avoid redirects that browsers reject during an S3 upload.
+s3 = boto3.client('s3', region_name=REGION, endpoint_url=f'https://s3.{REGION}.amazonaws.com',
+                  config=Config(signature_version='s3v4', s3={'addressing_style': 'virtual'}))
 db = boto3.client('dynamodb')
 serialize = TypeSerializer()
 deserialize = TypeDeserializer()

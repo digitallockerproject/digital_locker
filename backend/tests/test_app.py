@@ -24,6 +24,12 @@ def event(path='/documents', method='GET', data=None, sub='alice', **claims):
                 body=json.dumps(data) if data is not None else None)
 
 
+class EndpointTests(unittest.TestCase):
+    def test_signed_upload_uses_regional_endpoint(self):
+        post = app.s3.generate_presigned_post('test-bucket', 'private/test')
+        self.assertEqual(post['url'], 'https://test-bucket.s3.us-east-2.amazonaws.com/')
+
+
 class UploadTests(unittest.TestCase):
     def setUp(self):
         self.s3 = patch.object(app, 's3', Mock()).start()
