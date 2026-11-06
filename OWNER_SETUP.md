@@ -14,7 +14,7 @@ The old sample documents, pretend scans, and demo sharing controls are removed f
 
 ## 1. Check the account first
 
-Use the same account that owns the existing Cognito pool in **us-east-2**. Check Billing for the **Free account plan**, its expiry date, and remaining credits. Confirm that S3, Lambda, API Gateway HTTP APIs, DynamoDB provisioned capacity, CloudWatch Logs, and the deployment packaging bucket are available under that plan.
+Use the AWS account that will own the upload storage and deploy in **us-east-2**. This can be separate from the account that owns the existing Cognito pool. The API checks tokens from that pool using its public issuer and signing keys; it does not need access to the other AWS account. Check Billing for the **Free account plan**, its expiry date, and remaining credits. Confirm that S3, Lambda, API Gateway HTTP APIs, DynamoDB provisioned capacity, CloudWatch Logs, and the deployment packaging bucket are available under that plan.
 
 Do not switch to the Paid plan to complete this setup. If AWS asks for an upgrade or a required service is unavailable, stop. The app limits below reduce usage; they do not guarantee a $0 bill on a Paid plan. Other resources in the account also consume credits.
 
