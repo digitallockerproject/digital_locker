@@ -13,7 +13,7 @@ npm run dev
 
 The local address is `http://127.0.0.1:5173/digital_locker/`. Sign-in settings are in [AUTH_SETUP.md](AUTH_SETUP.md).
 
-The website starts without sample documents. If the upload API has not been configured, it shows a setup message and disables uploads. Follow [OWNER_SETUP.md](OWNER_SETUP.md) to deploy and connect the backend.
+Uploads are deployed in us-east-2 and connected through the GitHub repository variable `VITE_DOCUMENT_API_URL`. The website starts with an empty locker for each user. For local development, copy `.env.example` to `.env` and set the API address; browser requests also need an allowed origin in the API and bucket CORS settings.
 
 ```sh
 npm run build
@@ -37,7 +37,6 @@ There is no malware scanning, public sharing, file deletion, or account editing 
 - `src/auth-config.js`: existing Cognito sign-in settings.
 - `backend/app.py`: upload, list, confirmation, and download endpoints.
 - `backend/template.yaml`: AWS resources and runtime permissions.
-- `OWNER_SETUP.md`: account checks, deployment, and remaining live tests.
 
 ## Backend checks
 
@@ -50,4 +49,10 @@ python3 -m venv .venv
 AWS_DEFAULT_REGION=us-east-2 AWS_EC2_METADATA_DISABLED=true .venv/bin/cfn-lint backend/template.yaml
 ```
 
-The tests mock AWS calls; they do not create cloud resources or prove that a particular AWS account will allow deployment. The frontend build, 6 frontend request tests, and 16 backend tests pass, and the template passes cfn-lint. A live browser upload, page refresh, and matching download were verified on November 6, 2026. The API also rejected unsigned requests. Additional manual checks remain in the setup guide.
+The tests mock AWS calls; they do not create cloud resources or prove that a particular AWS account will allow deployment. The frontend build, 6 frontend request tests, and 16 backend tests pass, and the template passes cfn-lint. A live browser upload, page refresh, and matching download were verified on November 6, 2026. The API also rejected unsigned requests.
+
+## Current limits
+
+Files can be PDF, PNG, or JPEG, up to 5 MiB each. The app allows 20 upload reservations per user, 100 across the app, and 100 MiB reserved storage total. Failed uploads keep their reservation. Files are not automatically deleted.
+
+The AWS account remains on the Free plan, which ends May 6, 2027 or when its credits run out. The S3 bucket and DynamoDB table are retained if the backend stack is removed.

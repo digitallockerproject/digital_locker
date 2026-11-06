@@ -87,7 +87,7 @@ export default function App({ account, onSignOut }) {
       <header className="topbar"><div className="breadcrumbs"><button className="icon-button mobile-menu" aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="sidebar" onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button><strong>{page}</strong></div><button className="button secondary small" onClick={onSignOut}>Sign out</button></header>
       <main id="main">
         <div className="page-heading"><div><p className="eyebrow">YOUR PERSONAL DOCUMENT SPACE</p><h1>{page === 'Dashboard' ? 'Everything important. One place.' : page}</h1><p>Upload and retrieve your own documents.</p></div><button className="button primary" disabled={!apiUrl || busy} onClick={openUpload}><Icon name="plus" size={19} /> Add document</button></div>
-        {!apiUrl && <p className="inline-notice" role="status">Uploads are not connected yet. Ask the project owner to finish connecting storage.</p>}
+        {!apiUrl && <p className="inline-notice" role="status">Document storage is temporarily unavailable.</p>}
         {!modal && feedback}
         <p className="inline-notice"><Icon name="info" size={16} /> Files are stored privately. Malware scanning and public sharing are not enabled. Use non-sensitive test files for this demo.</p>
         {page === 'Dashboard' && <section className="stats-grid" aria-label="Locker overview">{[['Saved files', completed.length], ['Pending uploads', documents.length - completed.length], ['Storage used', `${(documents.reduce((total, doc) => total + doc.sizeBytes, 0) / 1048576).toFixed(1)} MiB`]].map(([label, value]) => <div className="stat-card" key={label}><span>{label}</span><strong className="stat-number">{value}</strong></div>)}</section>}

@@ -13,7 +13,7 @@ export function validateFile(file) {
 }
 
 async function request(path, body) {
-  if (!apiUrl) throw new Error('Uploads are not connected yet. The AWS owner must finish setup.');
+  if (!apiUrl) throw new Error('Document storage is temporarily unavailable.');
   const user = await userManager.getUser();
   if (!user || user.expired) throw new Error('Your session expired. Sign in again.');
   const response = await fetch(`${apiUrl}${path}`, {

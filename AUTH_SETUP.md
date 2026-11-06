@@ -54,10 +54,6 @@ Open `http://127.0.0.1:5173/digital_locker/`, then choose **Sign in or create an
 
 For a production build, run `pnpm build`. The existing GitHub Actions workflow uses the updated pnpm lockfile. The included npm lockfile also supports `npm install`.
 
-## Deploy this update
-
-Upload all source files from the complete package into the root of `digitallockerproject/digital_locker`, including `.github`, `src/main.jsx`, and `pnpm-lock.yaml`. Merge the files into existing folders. Keep unchanged files when updating a folder. Commit to `main` to trigger the existing deployment workflow.
-
 ## Session handling
 
 OIDC state and tokens use `sessionStorage` in the current browser tab. A page refresh keeps that local session. Closing the tab drops its local tokens, but does not by itself terminate Cognito's separate hosted sign-in cookie.
@@ -66,7 +62,7 @@ OIDC state and tokens use `sessionStorage` in the current browser tab. A page re
 
 ## Upload backend
 
-Private file uploads now have a separate backend. See [OWNER_SETUP.md](OWNER_SETUP.md) for deployment and [README.md](README.md) for the request flow. Existing Cognito identifiers and sign-in behavior are unchanged. The API verifies access tokens and uses the verified `sub` to separate document records.
+Private uploads are deployed and connected. See [README.md](README.md) for the request flow. Existing Cognito identifiers and sign-in behavior are unchanged. The API verifies access tokens and uses the verified `sub` to separate document records.
 
 There is no malware scanner or public sharing service. Uploaded files show **Not scanned**. Files and metadata persist in AWS; browser-only preferences and fictional sample records are no longer used by the active document screens.
 
