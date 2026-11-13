@@ -29,15 +29,28 @@ async function request(path, body) {
 
 export const listDocuments = () => request('/documents');
 export const completeUpload = id => request(`/documents/${encodeURIComponent(id)}/complete`, {});
+export const deleteDocument = id => request(`/documents/${encodeURIComponent(id)}/delete`, {});
 export const downloadDocument = id => request(`/documents/${encodeURIComponent(id)}/download`);
 export async function uploadDocument(file, category, onReserved) {
   const contentType = validateFile(file);
   const reservation = await request('/uploads', { name: file.name, size: file.size, contentType, category });
   onReserved(reservation.document);
-  const form = new FormData();
-  for (const [key, value] of Object.entries(reservation.upload.fields)) form.append(key, value);
-  form.append('file', file); // S3 requires the file field last.
-  const response = await fetch(reservation.upload.url, { method: 'POST', body: form, signal: AbortSignal.timeout(120000) });
+  const response = await fetch(reservation.upload.url, {
+    method: 'PUT', headers: reservation.upload.headers, body: file, signal: AbortSignal.timeout(120000),
+  });
   if (!response.ok) throw new Error('File transfer failed. The pending record is saved; choose the file again to make a new upload.');
   return completeUpload(reservation.document.id);
+}
+
+export const createShare = (id, options) => request(`/documents/${encodeURIComponent(id)}/shares`, options);
+export const listShares = id => request(`/documents/${encodeURIComponent(id)}/shares`);
+export const revokeShare = (id, digest) => request(`/documents/${encodeURIComponent(id)}/shares/${encodeURIComponent(digest)}/revoke`, {});
+export async function redeemShare(token) {
+  if (!apiUrl || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error('This share link is invalid.');
+  const response = await fetch(`${apiUrl}/shares/${encodeURIComponent(token)}/redeem`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(20000),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'This share link is unavailable.');
+  return data;
 }

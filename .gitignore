@@ -10,3 +10,5 @@ dist/
 .venv/
 __pycache__/
 samconfig.toml
+
+backend/scanner-image.txt

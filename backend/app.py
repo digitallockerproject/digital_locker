@@ -1,10 +1,12 @@
 """Private uploads. API Gateway verifies JWT signatures before invoking this function."""
 import base64
+import hashlib
+import secrets
 import json
 import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import boto3
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -75,7 +77,7 @@ def body(event):
 
 def get_document(sub, document_id):
     result = db.get_item(TableName=TABLE, Key=values({'pk': f'USER#{sub}', 'sk': f'DOC#{document_id}'}), ConsistentRead=True)
-    if 'Item' not in result:
+    if 'Item' not in result or unpack(result['Item']).get('status') == 'Deleted':
         raise RequestError(404, 'Document not found.')
     return unpack(result['Item'])
 
@@ -115,16 +117,19 @@ def reserve(sub, data):
             if any(reason.get('Code') == 'ConditionalCheckFailed' for reason in reasons):
                 raise RequestError(409, 'The demo upload limit has been reached. Ask the account owner to review storage.') from error
         raise
-    upload = s3.generate_presigned_post(
-        BUCKET, key,
-        Fields={'Content-Type': content_type, 'x-amz-server-side-encryption': 'AES256'},
-        Conditions=[{'Content-Type': content_type}, {'x-amz-server-side-encryption': 'AES256'}, ['content-length-range', size, size]],
-        ExpiresIn=60)
+    upload = {
+        'url': s3.generate_presigned_url('put_object', Params={
+            'Bucket': BUCKET, 'Key': key, 'ContentType': content_type,
+            'ContentLength': size, 'ServerSideEncryption': 'AES256', 'IfNoneMatch': '*'}, ExpiresIn=60),
+        'method': 'PUT',
+        'headers': {'Content-Type': content_type, 'x-amz-server-side-encryption': 'AES256', 'If-None-Match': '*'},
+    }
     return reply(201, {'document': public(item), 'upload': upload})
 
 
-def finish(sub, document_id):
-    item = get_document(sub, document_id)
+def inspect(item):
+    if item['status'] in ('Deleted', 'Deleting'):
+        raise RequestError(409, 'This document is being deleted.')
     try:
         head = s3.head_object(Bucket=BUCKET, Key=item['objectKey'])
         if head['ContentLength'] != item['sizeBytes'] or head.get('ContentType') != item['contentType']:
@@ -143,35 +148,193 @@ def finish(sub, document_id):
     # A header check catches obvious mismatches. It is not a malware scan.
     if not prefix.startswith(expected[item['contentType']]):
         raise RequestError(400, 'The file contents do not match the selected file type.')
+    # Only the scanner's role can write this tag. Missing/error/skipped results
+    # never authorize a download, including files uploaded before scanning existed.
+    tags = s3.get_object_tagging(Bucket=BUCKET, Key=item['objectKey'])
+    scan = next((tag['Value'] for tag in tags.get('TagSet', [])
+                 if tag['Key'] == 'LockerMalwareScanStatus'), None)
+    status = {'NO_THREATS_FOUND': 'Clean', 'THREATS_FOUND': 'Flagged',
+              'UNSUPPORTED': 'Scan unavailable', 'ACCESS_DENIED': 'Scan unavailable',
+              'FAILED': 'Scan unavailable'}.get(scan, 'Scanning')
+    if scan is None and datetime.now(timezone.utc) - datetime.fromisoformat(item['createdAt']) > timedelta(minutes=15):
+        status = 'Scan unavailable'
+    if item['status'] != status:
+        db.update_item(TableName=TABLE, Key=values({'pk': item['pk'], 'sk': item['sk']}),
+                       UpdateExpression='SET #status = :status',
+                       ConditionExpression='attribute_exists(pk) AND #status <> :deleted AND #status <> :deleting',
+                       ExpressionAttributeNames={'#status': 'status'},
+                       ExpressionAttributeValues=values({':status': status, ':deleted': 'Deleted', ':deleting': 'Deleting'}))
+    return item | {'status': status}
+
+
+def finish(sub, document_id):
+    return reply(200, {'document': public(inspect(get_document(sub, document_id)))})
+
+
+def remove(sub, document_id):
+    item = get_document(sub, document_id)
+    # Give the upload URL time to expire before removing its immutable object.
+    if datetime.now(timezone.utc) - datetime.fromisoformat(item['createdAt']) < timedelta(minutes=5):
+        raise RequestError(409, 'Wait five minutes after adding a file before deleting it.')
     db.update_item(TableName=TABLE, Key=values({'pk': item['pk'], 'sk': item['sk']}),
-                   UpdateExpression='SET #status = :status', ConditionExpression='attribute_exists(pk)',
-                   ExpressionAttributeNames={'#status': 'status'}, ExpressionAttributeValues=values({':status': 'Not scanned'}))
-    item['status'] = 'Not scanned'
-    return reply(200, {'document': public(item)})
+                   UpdateExpression='SET #status = :deleted', ConditionExpression='attribute_exists(pk)',
+                   ExpressionAttributeNames={'#status': 'status'},
+                   ExpressionAttributeValues=values({':deleted': 'Deleting'}))
+    s3.delete_object(Bucket=BUCKET, Key=item['objectKey'])
+    db.update_item(TableName=TABLE, Key=values({'pk': item['pk'], 'sk': item['sk']}),
+                   UpdateExpression='SET #status = :deleted',
+                   ExpressionAttributeNames={'#status': 'status'},
+                   ExpressionAttributeValues=values({':deleted': 'Deleted'}))
+    # Reservations remain counted to bound cumulative scanning and storage usage.
+    return reply(200, {'deleted': document_id})
+
+
+def list_item(item):
+    if item['status'] in ('Pending upload', 'Deleted', 'Deleting'):
+        return public(item)
+    try:
+        return public(inspect(item))
+    except RequestError:
+        return public(item | {'status': 'Scan unavailable'})
+
+
+def share_key(digest):
+    return values({'pk': f'SHARE#{digest}', 'sk': 'LINK'})
+
+
+def share_public(item):
+    return {key: item[key] for key in ('id', 'expiresAt', 'maxUses', 'uses', 'revoked')}
+
+
+def create_share(sub, document_id, data):
+    minutes, maximum = data.get('expiresMinutes'), data.get('maxUses')
+    if type(minutes) is not int or not 15 <= minutes <= 10080 or type(maximum) is not int or not 1 <= maximum <= 10:
+        raise RequestError(400, 'Choose 15 minutes to 7 days and 1–10 link uses.')
+    item = inspect(get_document(sub, document_id))
+    if item['status'] != 'Clean':
+        raise RequestError(409, 'Only files with a clean scan can be shared.')
+    token = secrets.token_urlsafe(32)
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    record = {'pk': f'SHARE#{digest}', 'sk': 'LINK', 'id': digest, 'owner': sub,
+              'documentId': document_id, 'expiresAt': int(datetime.now(timezone.utc).timestamp()) + minutes * 60,
+              'maxUses': maximum, 'uses': 0, 'revoked': False}
+    transactions = []
+    for pk, limit in [(f'USER#{sub}', 20), ('GLOBAL', 100)]:
+        transactions.append({'Update': {
+            'TableName': TABLE, 'Key': values({'pk': pk, 'sk': 'QUOTA'}),
+            'UpdateExpression': 'ADD shares :one',
+            'ConditionExpression': 'attribute_not_exists(shares) OR shares < :limit',
+            'ExpressionAttributeValues': values({':one': 1, ':limit': limit})}})
+    for row in [record, {'pk': f'USER#{sub}', 'sk': f'LINK#{document_id}#{digest}', 'id': digest}]:
+        transactions.append({'Put': {'TableName': TABLE, 'Item': values(row), 'ConditionExpression': 'attribute_not_exists(pk)'}})
+    try:
+        db.transact_write_items(TransactItems=transactions)
+    except ClientError as error:
+        if error.response['Error']['Code'] == 'TransactionCanceledException':
+            raise RequestError(409, 'The demo share-link limit has been reached.') from error
+        raise
+    return reply(201, {'share': share_public(record), 'token': token})
+
+
+def list_shares(sub, document_id):
+    get_document(sub, document_id)
+    rows = db.query(TableName=TABLE, KeyConditionExpression='pk = :pk AND begins_with(sk, :prefix)',
+                    ExpressionAttributeValues=values({':pk': f'USER#{sub}', ':prefix': f'LINK#{document_id}#'}),
+                    ConsistentRead=True)
+    links = []
+    for row in rows.get('Items', []):
+        record = db.get_item(TableName=TABLE, Key=share_key(unpack(row)['id']), ConsistentRead=True)
+        if 'Item' in record:
+            links.append(share_public(unpack(record['Item'])))
+    return reply(200, {'shares': links})
+
+
+def revoke_share(sub, document_id, digest):
+    get_document(sub, document_id)
+    try:
+        db.update_item(TableName=TABLE, Key=share_key(digest),
+                       UpdateExpression='SET revoked = :true',
+                       ConditionExpression='#owner = :owner AND documentId = :document',
+                       ExpressionAttributeNames={'#owner': 'owner'},
+                       ExpressionAttributeValues=values({':true': True, ':owner': sub, ':document': document_id}))
+    except ClientError as error:
+        if error.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            raise RequestError(404, 'Share link not found.') from error
+        raise
+    return reply(200, {'revoked': digest})
+
+
+def redeem_share(token):
+    digest = hashlib.sha256(token.encode()).hexdigest()
+    result = db.get_item(TableName=TABLE, Key=share_key(digest), ConsistentRead=True)
+    if 'Item' not in result:
+        raise RequestError(410, 'This link is unavailable, expired, or has no uses left.')
+    record = unpack(result['Item'])
+    now = int(datetime.now(timezone.utc).timestamp())
+    if record['revoked'] or record['expiresAt'] <= now or record['uses'] >= record['maxUses']:
+        raise RequestError(410, 'This link is unavailable, expired, or has no uses left.')
+    item = inspect(get_document(record['owner'], record['documentId']))
+    if item['status'] != 'Clean':
+        raise RequestError(410, 'This file is not available to download.')
+    # Atomic reservation prevents simultaneous visitors from exceeding the limit.
+    now = int(datetime.now(timezone.utc).timestamp())
+    try:
+        db.update_item(TableName=TABLE, Key=share_key(digest),
+                       UpdateExpression='ADD #uses :one',
+                       ConditionExpression='revoked = :false AND expiresAt > :now AND #uses < maxUses',
+                       ExpressionAttributeNames={'#uses': 'uses'},
+                       ExpressionAttributeValues=values({':one': 1, ':false': False, ':now': now}))
+    except ClientError as error:
+        if error.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            raise RequestError(410, 'This link is unavailable, expired, or has no uses left.') from error
+        raise
+    url = s3.generate_presigned_url('get_object', Params={
+        'Bucket': BUCKET, 'Key': item['objectKey'],
+        'ResponseContentDisposition': 'attachment; filename="document.' + item['name'].rsplit('.', 1)[-1].lower() + '"',
+        'ResponseContentType': 'application/octet-stream'}, ExpiresIn=min(15, record['expiresAt'] - now))
+    return reply(200, {'url': url, 'name': item['name']})
 
 
 def handler(event, context):
     try:
-        sub = owner(event)
         method = event.get('requestContext', {}).get('http', {}).get('method')
         path = event.get('rawPath', '')
+        public_match = re.fullmatch(r'/shares/([A-Za-z0-9_-]{43})/redeem', path)
+        if method == 'POST' and public_match:
+            return redeem_share(public_match.group(1))
+        sub = owner(event)
+        share_match = re.fullmatch(r'/documents/([a-f0-9-]{36})/shares(?:/([a-f0-9]{64})/revoke)?', path)
+        if share_match:
+            document_id, digest = share_match.groups()
+            if method == 'POST' and digest:
+                return revoke_share(sub, document_id, digest)
+            if not digest and method == 'POST':
+                return create_share(sub, document_id, body(event))
+            if not digest and method == 'GET':
+                return list_shares(sub, document_id)
         if method == 'GET' and path == '/documents':
             result = db.query(TableName=TABLE, KeyConditionExpression='pk = :pk AND begins_with(sk, :prefix)',
                               ExpressionAttributeValues=values({':pk': f'USER#{sub}', ':prefix': 'DOC#'}), ConsistentRead=True)
-            documents = [public(unpack(item)) for item in result.get('Items', [])]
+            documents = [list_item(unpack(item)) for item in result.get('Items', [])
+                         if unpack(item)['status'] != 'Deleted']
             documents.sort(key=lambda item: item['createdAt'], reverse=True)
             return reply(200, {'documents': documents})
         if method == 'POST' and path == '/uploads':
             return reserve(sub, body(event))
-        match = re.fullmatch(r'/documents/([a-f0-9-]{36})/(complete|download)', path)
+        match = re.fullmatch(r'/documents/([a-f0-9-]{36})/(complete|download|delete)', path)
         if match:
             document_id, action = match.groups()
+            if method == 'POST' and action == 'delete':
+                return remove(sub, document_id)
             if method == 'POST' and action == 'complete':
                 return finish(sub, document_id)
             if method == 'GET' and action == 'download':
                 item = get_document(sub, document_id)
-                if item['status'] != 'Not scanned':
-                    raise RequestError(409, 'Confirm the upload before downloading it.')
+                if item['status'] == 'Deleting':
+                    raise RequestError(409, 'This document is being deleted.')
+                item = inspect(item)
+                if item['status'] != 'Clean':
+                    raise RequestError(409, 'Download is blocked until a malware scan reports no threats.')
                 # Always download as an attachment. Do not render untrusted files inline.
                 url = s3.generate_presigned_url('get_object', Params={
                     'Bucket': BUCKET, 'Key': item['objectKey'],

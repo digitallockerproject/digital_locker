@@ -34,23 +34,24 @@ test('requests use access tokens rather than ID tokens', async () => {
   assert.deepEqual(await api.listDocuments(), { documents: [] });
 });
 
-test('successful upload reserves, transfers file last, then confirms', async () => {
+test('successful upload reserves, transfers immutable PUT, then confirms', async () => {
   globalThis.testSession = { access_token: 'access' };
   const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push(url);
-    if (url.endsWith('/uploads')) return Response.json({ document: { id: 'one' }, upload: { url: 'https://s3.example', fields: { key: 'private/one' } } });
+    if (url.endsWith('/uploads')) return Response.json({ document: { id: 'one' }, upload: { url: 'https://s3.example', headers: { 'If-None-Match': '*' } } });
     if (url === 'https://s3.example') {
-      assert.equal(options.headers, undefined);
-      assert.deepEqual([...options.body.keys()], ['key', 'file']);
+      assert.equal(options.method, 'PUT');
+      assert.equal(options.headers['If-None-Match'], '*');
+      assert.equal(options.body, pdf);
       return new Response(null, { status: 204 });
     }
-    return Response.json({ document: { id: 'one', status: 'Not scanned' } });
+    return Response.json({ document: { id: 'one', status: 'Scanning' } });
   };
   let reserved;
   const result = await api.uploadDocument(pdf, 'Academic', item => { reserved = item; });
   assert.equal(reserved.id, 'one');
-  assert.equal(result.document.status, 'Not scanned');
+  assert.equal(result.document.status, 'Scanning');
   assert.deepEqual(calls, ['https://api.example/uploads', 'https://s3.example', 'https://api.example/documents/one/complete']);
 });
 
@@ -59,7 +60,7 @@ test('failed transfer is never marked complete', async () => {
   const calls = [];
   globalThis.fetch = async url => {
     calls.push(url);
-    if (url.endsWith('/uploads')) return Response.json({ document: { id: 'one' }, upload: { url: 'https://s3.example', fields: {} } });
+    if (url.endsWith('/uploads')) return Response.json({ document: { id: 'one' }, upload: { url: 'https://s3.example', headers: {} } });
     return new Response(null, { status: 403 });
   };
   await assert.rejects(api.uploadDocument(pdf, 'Academic', () => {}), /transfer failed/);
@@ -70,4 +71,30 @@ test('backend errors reach the user', async () => {
   globalThis.testSession = { access_token: 'access' };
   globalThis.fetch = async () => Response.json({ error: 'The demo upload limit has been reached.' }, { status: 409 });
   await assert.rejects(api.listDocuments(), /upload limit/);
+});
+
+test('deletion uses the authenticated owner endpoint', async () => {
+  globalThis.testSession = { access_token: 'access' };
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.example/documents/one/delete');
+    assert.equal(options.method, 'POST');
+    assert.equal(options.headers.Authorization, 'Bearer access');
+    return Response.json({ deleted: 'one' });
+  };
+  assert.deepEqual(await api.deleteDocument('one'), { deleted: 'one' });
+});
+
+test('public redemption uses no signed-in session and never sends bearer tokens', async () => {
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.example/shares/' + 'a'.repeat(43) + '/redeem');
+    assert.equal(options.method, 'POST');
+    assert.equal(options.headers.Authorization, undefined);
+    return Response.json({ url: 'https://download.example' });
+  };
+  assert.deepEqual(await api.redeemShare('a'.repeat(43)), { url: 'https://download.example' });
+});
+
+test('malformed share tokens never make network requests', async () => {
+  globalThis.fetch = () => assert.fail('Must not fetch');
+  await assert.rejects(api.redeemShare('../bad'), /invalid/);
 });

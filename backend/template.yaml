@@ -2,6 +2,10 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Digital Locker private upload demo
 Parameters:
+  ScannerImageUri:
+    Type: String
+    Description: Digest-pinned ClamAV image from this account's ECR repository in us-east-2.
+    AllowedPattern: '[0-9]{12}\.dkr\.ecr\.us-east-2\.amazonaws\.com/digital-locker-scanner@sha256:[a-f0-9]{64}'
   FreePlanConfirmed:
     Type: String
     Default: 'no'
@@ -40,10 +44,13 @@ Resources:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins: [!Ref WebOrigin]
-            AllowedMethods: [POST]
+            AllowedMethods: [PUT]
             AllowedHeaders: ['*']
             MaxAge: 300
   FilesPolicy:
@@ -60,6 +67,16 @@ Resources:
             Condition:
               Bool:
                 aws:SecureTransport: 'false'
+          - Sid: RequireImmutableUploads
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${Files.Arn}/private/*'
+            Condition:
+              'Null':
+                s3:if-none-match: 'true'
+              ArnEquals:
+                aws:PrincipalArn: !GetAtt UploadFunctionRole.Arn
   Documents:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
@@ -107,7 +124,7 @@ Resources:
       Handler: app.handler
       Runtime: python3.13
       MemorySize: 128
-      Timeout: 15
+      Timeout: 30
       # No reserved concurrency: small Free plan accounts may not have enough
       # regional concurrency to reserve it. API throttling limits normal traffic.
       Environment:
@@ -120,12 +137,38 @@ Resources:
         - Version: '2012-10-17'
           Statement:
             - Effect: Allow
-              Action: [s3:PutObject, s3:GetObject]
+              Action: [s3:PutObject, s3:GetObject, s3:GetObjectTagging, s3:DeleteObject]
               Resource: !Sub '${Files.Arn}/private/*'
             - Effect: Allow
               Action: [dynamodb:GetItem, dynamodb:Query, dynamodb:UpdateItem, dynamodb:PutItem]
               Resource: !GetAtt Documents.Arn
       Events:
+        CreateShare:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents/{id}/shares
+            Method: POST
+        ListShares:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents/{id}/shares
+            Method: GET
+        RevokeShare:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents/{id}/shares/{digest}/revoke
+            Method: POST
+        RedeemShare:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /shares/{token}/redeem
+            Method: POST
+            Auth:
+              Authorizer: NONE
         List:
           Type: HttpApi
           Properties:
@@ -144,12 +187,58 @@ Resources:
             ApiId: !Ref Api
             Path: /documents/{id}/complete
             Method: POST
+        Delete:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /documents/{id}/delete
+            Method: POST
         Download:
           Type: HttpApi
           Properties:
             ApiId: !Ref Api
             Path: /documents/{id}/download
             Method: GET
+  ScanFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageUri: !Ref ScannerImageUri
+      Architectures: [x86_64]
+      MemorySize: 2048
+      Timeout: 300
+      EphemeralStorage:
+        Size: 1024
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
+        MaximumEventAgeInSeconds: 600
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref Files
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: [s3:GetObject, s3:GetObjectTagging, s3:PutObjectTagging]
+              Resource: !Sub '${Files.Arn}/private/*'
+      Events:
+        Uploaded:
+          Type: EventBridgeRule
+          Properties:
+            Pattern:
+              source: [aws.s3]
+              detail-type: [Object Created]
+              detail:
+                bucket:
+                  name: [!Ref Files]
+                object:
+                  key:
+                    - prefix: private/
+  ScanLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ScanFunction}'
+      RetentionInDays: 7
   FunctionLogs:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -162,3 +251,5 @@ Outputs:
     Value: !Ref Files
   TableName:
     Value: !Ref Documents
+  ScannerFunctionName:
+    Value: !Ref ScanFunction
