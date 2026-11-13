@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import unittest
+from urllib.parse import urlparse, parse_qs
 from unittest.mock import Mock, patch
 
 os.environ.update(AWS_DEFAULT_REGION='us-east-2', AWS_ACCESS_KEY_ID='testing', AWS_SECRET_ACCESS_KEY='testing',
@@ -28,6 +29,14 @@ class EndpointTests(unittest.TestCase):
     def test_signed_upload_uses_regional_endpoint(self):
         post = app.s3.generate_presigned_post('test-bucket', 'private/test')
         self.assertEqual(post['url'], 'https://test-bucket.s3.us-east-2.amazonaws.com/')
+
+    def test_put_signature_binds_size_type_and_create_only_header(self):
+        url = app.s3.generate_presigned_url('put_object', Params={
+            'Bucket': 'test-bucket', 'Key': 'private/test', 'ContentLength': 12,
+            'ContentType': 'application/pdf', 'IfNoneMatch': '*', 'ServerSideEncryption': 'AES256'}, ExpiresIn=60)
+        headers = parse_qs(urlparse(url).query)['X-Amz-SignedHeaders'][0].split(';')
+        for name in ('content-length', 'content-type', 'if-none-match', 'x-amz-server-side-encryption'):
+            self.assertIn(name, headers)
 
 
 class UploadTests(unittest.TestCase):
